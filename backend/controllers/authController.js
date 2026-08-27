@@ -1,76 +1,46 @@
+const jwt = require("jsonwebtoken");
 
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+// Check if user is logged in (valid JWT token)
+const protect = (req, res, next) => {
+    let token;
 
-// REGISTER
-const registerUser = async (req, res) => {
-  try {
-    const { name, email, password, role } = req.body;
+    if (
+        req.headers.authorization &&
+        req.headers.authorization.startsWith("Bearer ")
+    ) {
+        try {
+            token = req.headers.authorization.split(" ")[1];
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+            // Attach decoded user information to request
+            req.user = decoded;
+
+            next();
+        } catch (error) {
+            return res.status(401).json({
+                message: "Not authorized, invalid token",
+            });
+        }
+    } else {
+        return res.status(401).json({
+            message: "Not authorized, no token",
+        });
     }
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create new user
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role,
-    });
-
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
 };
 
-// LOGIN
-const loginUser = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Check if user exists
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid email or password' });
+// Check if logged-in user is admin
+const adminOnly = (req, res, next) => {
+    if (req.user && req.user.role === "admin") {
+        next();
+    } else {
+        return res.status(403).json({
+            message: "Access denied, admin only",
+        });
     }
-
-    // Compare password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid email or password' });
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.status(200).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
 };
 
-module.exports = { registerUser, loginUser };
+module.exports = {
+    protect,
+    adminOnly,
+};
