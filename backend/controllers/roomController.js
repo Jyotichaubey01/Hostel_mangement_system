@@ -1,17 +1,45 @@
 const Room = require("../models/Room");
 
-// Create a new room
+// ==========================================
+// CREATE A NEW ROOM
+// ==========================================
 const createRoom = async (req, res) => {
     try {
-        const { roomNumber, block, floor, capacity, type } = req.body;
+        // Prevent error if request body is missing
+        const body = req.body || {};
 
-        if (!roomNumber || !block || floor === undefined || !capacity || !type) {
+        const {
+            roomNumber,
+            block,
+            floor,
+            capacity,
+            type
+        } = body;
+
+        // Validate room details
+        if (
+            !roomNumber ||
+            !block ||
+            floor === undefined ||
+            capacity === undefined ||
+            !type
+        ) {
             return res.status(400).json({
-                message: "Please provide all room details"
+                message: "Please provide all room details",
+                required: [
+                    "roomNumber",
+                    "block",
+                    "floor",
+                    "capacity",
+                    "type"
+                ]
             });
         }
 
-        const existingRoom = await Room.findOne({ roomNumber });
+        // Check whether room already exists
+        const existingRoom = await Room.findOne({
+            roomNumber
+        });
 
         if (existingRoom) {
             return res.status(400).json({
@@ -19,6 +47,7 @@ const createRoom = async (req, res) => {
             });
         }
 
+        // Create room
         const room = await Room.create({
             roomNumber,
             block,
@@ -28,7 +57,7 @@ const createRoom = async (req, res) => {
             occupants: []
         });
 
-        res.status(201).json({
+        return res.status(201).json({
             message: "Room created successfully",
             room
         });
@@ -36,20 +65,23 @@ const createRoom = async (req, res) => {
     } catch (error) {
         console.error("Create Room Error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             message: "Server error",
             error: error.message
         });
     }
 };
 
-// Get all rooms
+
+// ==========================================
+// GET ALL ROOMS
+// ==========================================
 const getRooms = async (req, res) => {
     try {
         const rooms = await Room.find()
             .populate("occupants", "name email");
 
-        res.status(200).json({
+        return res.status(200).json({
             count: rooms.length,
             rooms
         });
@@ -57,17 +89,25 @@ const getRooms = async (req, res) => {
     } catch (error) {
         console.error("Get Rooms Error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             message: "Server error",
             error: error.message
         });
     }
 };
 
-// Allocate room to a student
+
+// ==========================================
+// ALLOCATE ROOM TO STUDENT
+// ==========================================
 const allocateRoom = async (req, res) => {
     try {
-        const { roomId, studentId } = req.body;
+        const body = req.body || {};
+
+        const {
+            roomId,
+            studentId
+        } = body;
 
         if (!roomId || !studentId) {
             return res.status(400).json({
@@ -75,6 +115,7 @@ const allocateRoom = async (req, res) => {
             });
         }
 
+        // Find room
         const room = await Room.findById(roomId);
 
         if (!room) {
@@ -83,23 +124,28 @@ const allocateRoom = async (req, res) => {
             });
         }
 
+        // Check capacity
         if (room.occupants.length >= room.capacity) {
             return res.status(400).json({
                 message: "Room is already full"
             });
         }
 
-        if (room.occupants.includes(studentId)) {
+        // Check duplicate student
+        if (room.occupants.some(
+            occupant => occupant.toString() === studentId
+        )) {
             return res.status(400).json({
                 message: "Student is already allocated to this room"
             });
         }
 
+        // Add student
         room.occupants.push(studentId);
 
         await room.save();
 
-        res.status(200).json({
+        return res.status(200).json({
             message: "Room allocated successfully",
             room
         });
@@ -107,13 +153,17 @@ const allocateRoom = async (req, res) => {
     } catch (error) {
         console.error("Allocate Room Error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             message: "Server error",
             error: error.message
         });
     }
 };
 
+
+// ==========================================
+// EXPORT
+// ==========================================
 module.exports = {
     createRoom,
     getRooms,
