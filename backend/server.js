@@ -1,8 +1,3 @@
-const dns = require("dns");
-
-// Use Google DNS for MongoDB Atlas connection
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
-
 require("dotenv").config();
 
 const express = require("express");
@@ -41,12 +36,24 @@ app.use("/api/rooms", require("./routes/roomRoutes"));
 // Fee Management
 app.use("/api/fees", require("./routes/feeRoutes"));
 
+// Complaint Management
+app.use("/api/complaints", require("./routes/complaintRoutes"));
+
 // ==========================================
 // TEST ROUTE
 // ==========================================
 app.get("/", (req, res) => {
     res.status(200).json({
         message: "Hostel Management System API is running"
+    });
+});
+
+// ==========================================
+// 404 ROUTE
+// ==========================================
+app.use((req, res) => {
+    res.status(404).json({
+        message: `Route not found: ${req.method} ${req.originalUrl}`
     });
 });
 
@@ -68,6 +75,8 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
+    console.log("======================================");
     console.log(`Server running on port ${PORT}`);
     console.log(`API URL: http://localhost:${PORT}`);
+    console.log("======================================");
 });
