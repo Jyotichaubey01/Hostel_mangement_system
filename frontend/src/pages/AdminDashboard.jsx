@@ -1609,7 +1609,7 @@ const styles = {
         color: "#dc2626",
         background: "#fee2e2",
         padding: "12px",
-        borderRadius: "8px"
+        borderRadius: "10px"
     }
 };
 
