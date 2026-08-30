@@ -4,55 +4,173 @@ import axios from "axios";
 const API_URL = "http://localhost:5000";
 
 function AdminDashboard() {
-    const [complaints, setComplaints] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
+    const token = localStorage.getItem("token");
 
-    const [editingId, setEditingId] = useState(null);
-    const [status, setStatus] = useState("");
+    // ==============================
+    // STATE
+    // ==============================
+
+    const [complaints, setComplaints] = useState([]);
+    const [rooms, setRooms] = useState([]);
+    const [fees, setFees] = useState([]);
+
+    const [loadingComplaints, setLoadingComplaints] = useState(true);
+    const [loadingRooms, setLoadingRooms] = useState(true);
+    const [loadingFees, setLoadingFees] = useState(true);
+
+    const [complaintError, setComplaintError] = useState("");
+    const [roomError, setRoomError] = useState("");
+    const [feeError, setFeeError] = useState("");
+
+    // Complaint editing
+    const [editingComplaintId, setEditingComplaintId] = useState(null);
+    const [complaintStatus, setComplaintStatus] = useState("");
     const [adminResponse, setAdminResponse] = useState("");
 
-    const token = localStorage.getItem("token");
+    // Room form
+    const [showRoomForm, setShowRoomForm] = useState(false);
+    const [editingRoomId, setEditingRoomId] = useState(null);
+    const [roomNumber, setRoomNumber] = useState("");
+    const [capacity, setCapacity] = useState("");
+    const [occupied, setOccupied] = useState("");
+    const [roomLoading, setRoomLoading] = useState(false);
+
+    // Fee form
+    const [showFeeForm, setShowFeeForm] = useState(false);
+    const [feeLoading, setFeeLoading] = useState(false);
+
+    const [feeStudentId, setFeeStudentId] = useState("");
+    const [feeAmount, setFeeAmount] = useState("");
+    const [feeType, setFeeType] = useState("hostel");
+    const [feeDueDate, setFeeDueDate] = useState("");
+
+    // ==============================
+    // AUTH HEADERS
+    // ==============================
+
+    const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+    };
+
+    // ==============================
+    // GET COMPLAINTS
+    // ==============================
 
     const getComplaints = async () => {
         try {
-            setLoading(true);
+            setLoadingComplaints(true);
 
             const response = await axios.get(
                 `${API_URL}/api/complaints`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
+                { headers }
             );
 
             setComplaints(response.data.complaints || []);
-            setError("");
-        } catch (err) {
-            console.error(err);
-            setError(
-                err.response?.data?.message ||
+            setComplaintError("");
+        } catch (error) {
+            console.error("Complaint Error:", error);
+
+            setComplaintError(
+                error.response?.data?.message ||
                 "Unable to load complaints."
             );
         } finally {
-            setLoading(false);
+            setLoadingComplaints(false);
         }
     };
 
+    // ==============================
+    // GET ROOMS
+    // ==============================
+
+    const getRooms = async () => {
+        try {
+            setLoadingRooms(true);
+
+            const response = await axios.get(
+                `${API_URL}/api/rooms`,
+                { headers }
+            );
+
+            const roomData =
+                response.data.rooms ||
+                response.data;
+
+            setRooms(
+                Array.isArray(roomData)
+                    ? roomData
+                    : []
+            );
+
+            setRoomError("");
+        } catch (error) {
+            console.error("Room Error:", error);
+
+            setRoomError(
+                error.response?.data?.message ||
+                "Unable to load rooms."
+            );
+        } finally {
+            setLoadingRooms(false);
+        }
+    };
+
+    // ==============================
+    // GET FEES
+    // ==============================
+
+    const getFees = async () => {
+        try {
+            setLoadingFees(true);
+
+            const response = await axios.get(
+                `${API_URL}/api/fees`,
+                { headers }
+            );
+
+            setFees(response.data.fees || []);
+            setFeeError("");
+        } catch (error) {
+            console.error("Fee Error:", error);
+
+            setFeeError(
+                error.response?.data?.message ||
+                "Unable to load fees."
+            );
+        } finally {
+            setLoadingFees(false);
+        }
+    };
+
+    // ==============================
+    // LOAD DATA
+    // ==============================
+
     useEffect(() => {
+        if (!token) {
+            window.location.href = "/login";
+            return;
+        }
+
         getComplaints();
+        getRooms();
+        getFees();
     }, []);
 
-    const startEdit = (complaint) => {
-        setEditingId(complaint._id);
-        setStatus(complaint.status);
+    // ==============================
+    // COMPLAINT EDIT
+    // ==============================
+
+    const startComplaintEdit = (complaint) => {
+        setEditingComplaintId(complaint._id);
+        setComplaintStatus(complaint.status);
         setAdminResponse(complaint.adminResponse || "");
     };
 
-    const cancelEdit = () => {
-        setEditingId(null);
-        setStatus("");
+    const cancelComplaintEdit = () => {
+        setEditingComplaintId(null);
+        setComplaintStatus("");
         setAdminResponse("");
     };
 
@@ -61,45 +179,320 @@ function AdminDashboard() {
             await axios.put(
                 `${API_URL}/api/complaints/${id}`,
                 {
-                    status,
+                    status: complaintStatus,
                     adminResponse
                 },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Content-Type": "application/json"
-                    }
-                }
+                { headers }
             );
 
             alert("Complaint updated successfully.");
 
-            cancelEdit();
+            cancelComplaintEdit();
             getComplaints();
-        } catch (err) {
-            console.error(err);
+        } catch (error) {
+            console.error(error);
 
             alert(
-                err.response?.data?.message ||
+                error.response?.data?.message ||
                 "Failed to update complaint."
             );
         }
     };
 
+    // ==============================
+    // ROOM FORM
+    // ==============================
+
+    const resetRoomForm = () => {
+        setRoomNumber("");
+        setCapacity("");
+        setOccupied("");
+        setEditingRoomId(null);
+        setShowRoomForm(false);
+    };
+
+    const startRoomEdit = (room) => {
+        setEditingRoomId(room._id);
+
+        setRoomNumber(room.roomNumber || "");
+        setCapacity(room.capacity ?? "");
+        setOccupied(room.occupied ?? 0);
+
+        setShowRoomForm(true);
+    };
+
+    // ==============================
+    // ADD / UPDATE ROOM
+    // ==============================
+
+    const saveRoom = async (e) => {
+        e.preventDefault();
+
+        if (!roomNumber || !capacity) {
+            alert("Please enter room number and capacity.");
+            return;
+        }
+
+        if (Number(occupied || 0) > Number(capacity)) {
+            alert("Occupied students cannot exceed capacity.");
+            return;
+        }
+
+        try {
+            setRoomLoading(true);
+
+            const roomData = {
+                roomNumber,
+                capacity: Number(capacity),
+                occupied: Number(occupied || 0)
+            };
+
+            if (editingRoomId) {
+                await axios.put(
+                    `${API_URL}/api/rooms/${editingRoomId}`,
+                    roomData,
+                    { headers }
+                );
+
+                alert("Room updated successfully.");
+            } else {
+                await axios.post(
+                    `${API_URL}/api/rooms`,
+                    roomData,
+                    { headers }
+                );
+
+                alert("Room added successfully.");
+            }
+
+            resetRoomForm();
+            getRooms();
+        } catch (error) {
+            console.error("Room Save Error:", error);
+
+            alert(
+                error.response?.data?.message ||
+                "Failed to save room."
+            );
+        } finally {
+            setRoomLoading(false);
+        }
+    };
+
+    // ==============================
+    // DELETE ROOM
+    // ==============================
+
+    const deleteRoom = async (id) => {
+        const confirmDelete = window.confirm(
+            "Are you sure you want to delete this room?"
+        );
+
+        if (!confirmDelete) return;
+
+        try {
+            await axios.delete(
+                `${API_URL}/api/rooms/${id}`,
+                { headers }
+            );
+
+            alert("Room deleted successfully.");
+            getRooms();
+        } catch (error) {
+            console.error("Delete Room Error:", error);
+
+            alert(
+                error.response?.data?.message ||
+                "Failed to delete room."
+            );
+        }
+    };
+
+    // ==============================
+    // FEE FORM
+    // ==============================
+
+    const resetFeeForm = () => {
+        setFeeStudentId("");
+        setFeeAmount("");
+        setFeeType("hostel");
+        setFeeDueDate("");
+        setShowFeeForm(false);
+    };
+
+    // ==============================
+    // ADD FEE
+    // ==============================
+
+    const saveFee = async (e) => {
+        e.preventDefault();
+
+        if (!feeStudentId || !feeAmount || !feeDueDate) {
+            alert("Please fill all fee details.");
+            return;
+        }
+
+        try {
+            setFeeLoading(true);
+
+            const feeData = {
+                student: feeStudentId,
+                amount: Number(feeAmount),
+                feeType,
+                dueDate: feeDueDate
+            };
+
+            await axios.post(
+                `${API_URL}/api/fees`,
+                feeData,
+                { headers }
+            );
+
+            alert("Fee added successfully.");
+
+            resetFeeForm();
+            getFees();
+        } catch (error) {
+            console.error("Fee Save Error:", error);
+
+            alert(
+                error.response?.data?.message ||
+                "Failed to add fee."
+            );
+        } finally {
+            setFeeLoading(false);
+        }
+    };
+
+    // ==============================
+    // MARK FEE PAID
+    // ==============================
+
+    const markFeePaid = async (id) => {
+        const confirmPayment = window.confirm(
+            "Mark this fee as paid?"
+        );
+
+        if (!confirmPayment) return;
+
+        try {
+            await axios.put(
+                `${API_URL}/api/fees/${id}/pay`,
+                {},
+                { headers }
+            );
+
+            alert("Fee marked as paid.");
+            getFees();
+        } catch (error) {
+            console.error("Fee Payment Error:", error);
+
+            alert(
+                error.response?.data?.message ||
+                "Failed to mark fee as paid."
+            );
+        }
+    };
+
+    // ==============================
+    // DELETE FEE
+    // ==============================
+
+    const deleteFee = async (id) => {
+        const confirmDelete = window.confirm(
+            "Are you sure you want to delete this fee?"
+        );
+
+        if (!confirmDelete) return;
+
+        try {
+            await axios.delete(
+                `${API_URL}/api/fees/${id}`,
+                { headers }
+            );
+
+            alert("Fee deleted successfully.");
+            getFees();
+        } catch (error) {
+            console.error("Delete Fee Error:", error);
+
+            alert(
+                error.response?.data?.message ||
+                "Failed to delete fee."
+            );
+        }
+    };
+
+    // ==============================
+    // LOGOUT
+    // ==============================
+
     const logout = () => {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+
         window.location.href = "/login";
     };
 
-    const pendingCount = complaints.filter(
+    // ==============================
+    // STATISTICS
+    // ==============================
+
+    const pendingComplaints = complaints.filter(
         (complaint) => complaint.status === "pending"
     ).length;
+
+    const resolvedComplaints = complaints.filter(
+        (complaint) => complaint.status === "resolved"
+    ).length;
+
+    const totalRooms = rooms.length;
+
+    const totalCapacity = rooms.reduce(
+        (total, room) =>
+            total + Number(room.capacity || 0),
+        0
+    );
+
+    const totalOccupied = rooms.reduce(
+        (total, room) =>
+            total + Number(room.occupied || 0),
+        0
+    );
+
+    const totalFees = fees.reduce(
+        (total, fee) =>
+            total + Number(fee.amount || 0),
+        0
+    );
+
+    const paidFees = fees
+        .filter((fee) => fee.status === "paid")
+        .reduce(
+            (total, fee) =>
+                total + Number(fee.amount || 0),
+            0
+        );
+
+    const pendingFees = fees
+        .filter((fee) => fee.status !== "paid")
+        .reduce(
+            (total, fee) =>
+                total + Number(fee.amount || 0),
+            0
+        );
+
+    // ==============================
+    // UI
+    // ==============================
 
     return (
         <div style={styles.page}>
 
+            {/* HEADER */}
+
             <header style={styles.header}>
+
                 <div>
                     <h1 style={styles.title}>
                         Hostel Management System
@@ -116,6 +509,7 @@ function AdminDashboard() {
                 >
                     Logout
                 </button>
+
             </header>
 
             <main style={styles.main}>
@@ -124,23 +518,27 @@ function AdminDashboard() {
                     Welcome, Hostel Admin 👋
                 </h2>
 
+                {/* STATISTICS */}
+
                 <div style={styles.cards}>
 
                     <div style={styles.card}>
                         <div style={styles.cardTitle}>
-                            🛏️ Rooms
+                            🛏️ Total Rooms
                         </div>
+
                         <div style={styles.cardNumber}>
-                            1
+                            {totalRooms}
                         </div>
                     </div>
 
                     <div style={styles.card}>
                         <div style={styles.cardTitle}>
-                            💰 Fees
+                            👥 Occupied
                         </div>
+
                         <div style={styles.cardNumber}>
-                            1
+                            {totalOccupied}/{totalCapacity}
                         </div>
                     </div>
 
@@ -148,6 +546,7 @@ function AdminDashboard() {
                         <div style={styles.cardTitle}>
                             📝 Complaints
                         </div>
+
                         <div style={styles.cardNumber}>
                             {complaints.length}
                         </div>
@@ -157,36 +556,251 @@ function AdminDashboard() {
                         <div style={styles.cardTitle}>
                             ⏳ Pending Complaints
                         </div>
+
                         <div style={styles.cardNumber}>
-                            {pendingCount}
+                            {pendingComplaints}
+                        </div>
+                    </div>
+
+                    <div style={styles.card}>
+                        <div style={styles.cardTitle}>
+                            💰 Total Fees
+                        </div>
+
+                        <div style={styles.cardNumber}>
+                            ₹{totalFees.toLocaleString("en-IN")}
                         </div>
                     </div>
 
                 </div>
 
+                {/* ROOMS */}
+
                 <section style={styles.section}>
 
-                    <h2 style={styles.sectionTitle}>
-                        Complaint Management
-                    </h2>
+                    <div style={styles.sectionHeader}>
 
-                    {loading && (
+                        <h2 style={styles.sectionTitle}>
+                            🛏️ Room Management
+                        </h2>
+
+                        <button
+                            onClick={() => {
+                                resetRoomForm();
+                                setShowRoomForm(true);
+                            }}
+                            style={styles.addButton}
+                        >
+                            + Add Room
+                        </button>
+
+                    </div>
+
+                    {showRoomForm && (
+
+                        <form
+                            onSubmit={saveRoom}
+                            style={styles.form}
+                        >
+
+                            <h3>
+                                {editingRoomId
+                                    ? "Edit Room"
+                                    : "Add New Room"}
+                            </h3>
+
+                            <label style={styles.label}>
+                                Room Number
+                            </label>
+
+                            <input
+                                type="text"
+                                value={roomNumber}
+                                onChange={(e) =>
+                                    setRoomNumber(e.target.value)
+                                }
+                                placeholder="Example: A-101"
+                                style={styles.input}
+                                required
+                            />
+
+                            <label style={styles.label}>
+                                Capacity
+                            </label>
+
+                            <input
+                                type="number"
+                                min="1"
+                                value={capacity}
+                                onChange={(e) =>
+                                    setCapacity(e.target.value)
+                                }
+                                placeholder="Example: 4"
+                                style={styles.input}
+                                required
+                            />
+
+                            <label style={styles.label}>
+                                Occupied
+                            </label>
+
+                            <input
+                                type="number"
+                                min="0"
+                                value={occupied}
+                                onChange={(e) =>
+                                    setOccupied(e.target.value)
+                                }
+                                placeholder="Example: 2"
+                                style={styles.input}
+                            />
+
+                            <div style={styles.buttons}>
+
+                                <button
+                                    type="submit"
+                                    disabled={roomLoading}
+                                    style={styles.updateButton}
+                                >
+                                    {roomLoading
+                                        ? "Saving..."
+                                        : editingRoomId
+                                        ? "Update Room"
+                                        : "Add Room"}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={resetRoomForm}
+                                    style={styles.cancelButton}
+                                >
+                                    Cancel
+                                </button>
+
+                            </div>
+
+                        </form>
+                    )}
+
+                    {roomError && (
+                        <p style={styles.error}>
+                            {roomError}
+                        </p>
+                    )}
+
+                    {loadingRooms && (
+                        <p style={styles.message}>
+                            Loading rooms...
+                        </p>
+                    )}
+
+                    {!loadingRooms &&
+                        rooms.length === 0 &&
+                        !roomError && (
+                            <p style={styles.message}>
+                                No rooms found.
+                            </p>
+                        )}
+
+                    <div style={styles.roomGrid}>
+
+                        {rooms.map((room) => {
+
+                            const available = Math.max(
+                                Number(room.capacity || 0) -
+                                Number(room.occupied || 0),
+                                0
+                            );
+
+                            return (
+                                <div
+                                    key={room._id}
+                                    style={styles.roomCard}
+                                >
+
+                                    <h3>
+                                        Room {room.roomNumber}
+                                    </h3>
+
+                                    <p>
+                                        Capacity: {room.capacity}
+                                    </p>
+
+                                    <p>
+                                        Occupied: {room.occupied || 0}
+                                    </p>
+
+                                    <p>
+                                        Available: {available}
+                                    </p>
+
+                                    <div style={styles.buttons}>
+
+                                        <button
+                                            onClick={() =>
+                                                startRoomEdit(room)
+                                            }
+                                            style={styles.editButton}
+                                        >
+                                            Edit
+                                        </button>
+
+                                        <button
+                                            onClick={() =>
+                                                deleteRoom(room._id)
+                                            }
+                                            style={styles.deleteButton}
+                                        >
+                                            Delete
+                                        </button>
+
+                                    </div>
+
+                                </div>
+                            );
+                        })}
+
+                    </div>
+
+                </section>
+
+                {/* COMPLAINTS */}
+
+                <section style={styles.section}>
+
+                    <div style={styles.sectionHeader}>
+
+                        <h2 style={styles.sectionTitle}>
+                            📝 Complaint Management
+                        </h2>
+
+                        <div>
+                            Resolved:{" "}
+                            <strong>
+                                {resolvedComplaints}
+                            </strong>
+                        </div>
+
+                    </div>
+
+                    {loadingComplaints && (
                         <p style={styles.message}>
                             Loading complaints...
                         </p>
                     )}
 
-                    {error && (
+                    {complaintError && (
                         <p style={styles.error}>
-                            {error}
+                            {complaintError}
                         </p>
                     )}
 
-                    {!loading && complaints.length === 0 && (
-                        <p style={styles.message}>
-                            No complaints found.
-                        </p>
-                    )}
+                    {!loadingComplaints &&
+                        complaints.length === 0 && (
+                            <p style={styles.message}>
+                                No complaints found.
+                            </p>
+                        )}
 
                     {complaints.map((complaint) => (
 
@@ -198,21 +812,21 @@ function AdminDashboard() {
                             <div style={styles.complaintHeader}>
 
                                 <div>
+
                                     <h3 style={styles.complaintTitle}>
                                         {complaint.title}
                                     </h3>
 
                                     <p style={styles.student}>
                                         Student:{" "}
-                                        {complaint.student?.name ||
-                                            "Unknown"}
+                                        {complaint.student?.name}
                                     </p>
 
                                     <p style={styles.student}>
                                         Email:{" "}
-                                        {complaint.student?.email ||
-                                            "Unknown"}
+                                        {complaint.student?.email}
                                     </p>
+
                                 </div>
 
                                 <span
@@ -237,7 +851,9 @@ function AdminDashboard() {
                             </p>
 
                             {complaint.adminResponse && (
+
                                 <div style={styles.response}>
+
                                     <strong>
                                         Admin Response:
                                     </strong>
@@ -245,10 +861,12 @@ function AdminDashboard() {
                                     <p>
                                         {complaint.adminResponse}
                                     </p>
+
                                 </div>
                             )}
 
-                            {editingId === complaint._id ? (
+                            {editingComplaintId ===
+                            complaint._id ? (
 
                                 <div style={styles.editBox}>
 
@@ -257,9 +875,9 @@ function AdminDashboard() {
                                     </label>
 
                                     <select
-                                        value={status}
+                                        value={complaintStatus}
                                         onChange={(e) =>
-                                            setStatus(
+                                            setComplaintStatus(
                                                 e.target.value
                                             )
                                         }
@@ -308,7 +926,9 @@ function AdminDashboard() {
                                         </button>
 
                                         <button
-                                            onClick={cancelEdit}
+                                            onClick={
+                                                cancelComplaintEdit
+                                            }
                                             style={styles.cancelButton}
                                         >
                                             Cancel
@@ -322,7 +942,9 @@ function AdminDashboard() {
 
                                 <button
                                     onClick={() =>
-                                        startEdit(complaint)
+                                        startComplaintEdit(
+                                            complaint
+                                        )
                                     }
                                     style={styles.editButton}
                                 >
@@ -332,8 +954,339 @@ function AdminDashboard() {
                             )}
 
                         </div>
-
                     ))}
+
+                </section>
+
+                {/* FEES */}
+
+                <section style={styles.section}>
+
+                    <div style={styles.sectionHeader}>
+
+                        <h2 style={styles.sectionTitle}>
+                            💰 Fee Management
+                        </h2>
+
+                        <button
+                            onClick={() => setShowFeeForm(true)}
+                            style={styles.addButton}
+                        >
+                            + Add Fee
+                        </button>
+
+                    </div>
+
+                    {/* FEE SUMMARY */}
+
+                    <div style={styles.feeSummary}>
+
+                        <div style={styles.feeSummaryCard}>
+                            <span>Total</span>
+                            <strong>
+                                ₹{totalFees.toLocaleString("en-IN")}
+                            </strong>
+                        </div>
+
+                        <div style={styles.feeSummaryCard}>
+                            <span>Paid</span>
+                            <strong>
+                                ₹{paidFees.toLocaleString("en-IN")}
+                            </strong>
+                        </div>
+
+                        <div style={styles.feeSummaryCard}>
+                            <span>Pending</span>
+                            <strong>
+                                ₹{pendingFees.toLocaleString("en-IN")}
+                            </strong>
+                        </div>
+
+                    </div>
+
+                    {/* ADD FEE FORM */}
+
+                    {showFeeForm && (
+
+                        <form
+                            onSubmit={saveFee}
+                            style={styles.form}
+                        >
+
+                            <h3>Add New Fee</h3>
+
+                            <label style={styles.label}>
+                                Student ID
+                            </label>
+
+                            <input
+                                type="text"
+                                value={feeStudentId}
+                                onChange={(e) =>
+                                    setFeeStudentId(
+                                        e.target.value
+                                    )
+                                }
+                                placeholder="Enter student ID"
+                                style={styles.input}
+                                required
+                            />
+
+                            <label style={styles.label}>
+                                Amount
+                            </label>
+
+                            <input
+                                type="number"
+                                min="1"
+                                value={feeAmount}
+                                onChange={(e) =>
+                                    setFeeAmount(
+                                        e.target.value
+                                    )
+                                }
+                                placeholder="Example: 5000"
+                                style={styles.input}
+                                required
+                            />
+
+                            <label style={styles.label}>
+                                Fee Type
+                            </label>
+
+                            <select
+                                value={feeType}
+                                onChange={(e) =>
+                                    setFeeType(
+                                        e.target.value
+                                    )
+                                }
+                                style={styles.input}
+                            >
+                                <option value="hostel">
+                                    Hostel
+                                </option>
+
+                                <option value="mess">
+                                    Mess
+                                </option>
+
+                                <option value="other">
+                                    Other
+                                </option>
+                            </select>
+
+                            <label style={styles.label}>
+                                Due Date
+                            </label>
+
+                            <input
+                                type="date"
+                                value={feeDueDate}
+                                onChange={(e) =>
+                                    setFeeDueDate(
+                                        e.target.value
+                                    )
+                                }
+                                style={styles.input}
+                                required
+                            />
+
+                            <div style={styles.buttons}>
+
+                                <button
+                                    type="submit"
+                                    disabled={feeLoading}
+                                    style={styles.updateButton}
+                                >
+                                    {feeLoading
+                                        ? "Adding..."
+                                        : "Add Fee"}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={resetFeeForm}
+                                    style={styles.cancelButton}
+                                >
+                                    Cancel
+                                </button>
+
+                            </div>
+
+                        </form>
+                    )}
+
+                    {feeError && (
+                        <p style={styles.error}>
+                            {feeError}
+                        </p>
+                    )}
+
+                    {loadingFees && (
+                        <p style={styles.message}>
+                            Loading fees...
+                        </p>
+                    )}
+
+                    {!loadingFees &&
+                        fees.length === 0 &&
+                        !feeError && (
+                            <p style={styles.message}>
+                                No fees found.
+                            </p>
+                        )}
+
+                    {/* FEE LIST */}
+
+                    {!loadingFees &&
+                        fees.length > 0 && (
+
+                            <div style={styles.feeTableWrapper}>
+
+                                <table style={styles.table}>
+
+                                    <thead>
+
+                                        <tr>
+                                            <th style={styles.th}>
+                                                Student
+                                            </th>
+
+                                            <th style={styles.th}>
+                                                Fee Type
+                                            </th>
+
+                                            <th style={styles.th}>
+                                                Amount
+                                            </th>
+
+                                            <th style={styles.th}>
+                                                Due Date
+                                            </th>
+
+                                            <th style={styles.th}>
+                                                Status
+                                            </th>
+
+                                            <th style={styles.th}>
+                                                Action
+                                            </th>
+                                        </tr>
+
+                                    </thead>
+
+                                    <tbody>
+
+                                        {fees.map((fee) => (
+
+                                            <tr key={fee._id}>
+
+                                                <td style={styles.td}>
+                                                    <strong>
+                                                        {fee.student?.name ||
+                                                            "Unknown"}
+                                                    </strong>
+
+                                                    <br />
+
+                                                    <small>
+                                                        {fee.student?.email ||
+                                                            ""}
+                                                    </small>
+                                                </td>
+
+                                                <td style={styles.td}>
+                                                    {fee.feeType}
+                                                </td>
+
+                                                <td style={styles.td}>
+                                                    ₹
+                                                    {Number(
+                                                        fee.amount || 0
+                                                    ).toLocaleString(
+                                                        "en-IN"
+                                                    )}
+                                                </td>
+
+                                                <td style={styles.td}>
+                                                    {fee.dueDate
+                                                        ? new Date(
+                                                              fee.dueDate
+                                                          ).toLocaleDateString(
+                                                              "en-IN"
+                                                          )
+                                                        : "-"}
+                                                </td>
+
+                                                <td style={styles.td}>
+
+                                                    <span
+                                                        style={{
+                                                            ...styles.status,
+                                                            ...(fee.status ===
+                                                            "paid"
+                                                                ? styles.resolved
+                                                                : styles.pending)
+                                                        }}
+                                                    >
+                                                        {fee.status}
+                                                    </span>
+
+                                                </td>
+
+                                                <td style={styles.td}>
+
+                                                    <div
+                                                        style={
+                                                            styles.buttons
+                                                        }
+                                                    >
+
+                                                        {fee.status !==
+                                                            "paid" && (
+
+                                                            <button
+                                                                onClick={() =>
+                                                                    markFeePaid(
+                                                                        fee._id
+                                                                    )
+                                                                }
+                                                                style={
+                                                                    styles.updateButton
+                                                                }
+                                                            >
+                                                                Mark Paid
+                                                            </button>
+                                                        )}
+
+                                                        <button
+                                                            onClick={() =>
+                                                                deleteFee(
+                                                                    fee._id
+                                                                )
+                                                            }
+                                                            style={
+                                                                styles.deleteButton
+                                                            }
+                                                        >
+                                                            Delete
+                                                        </button>
+
+                                                    </div>
+
+                                                </td>
+
+                                            </tr>
+
+                                        ))}
+
+                                    </tbody>
+
+                                </table>
+
+                            </div>
+                        )}
 
                 </section>
 
@@ -342,7 +1295,12 @@ function AdminDashboard() {
     );
 }
 
+// ======================================================
+// STYLES
+// ======================================================
+
 const styles = {
+
     page: {
         minHeight: "100vh",
         background: "#f1f5f9",
@@ -352,7 +1310,7 @@ const styles = {
     header: {
         background: "#1e293b",
         color: "white",
-        padding: "30px 5%",
+        padding: "25px 5%",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center"
@@ -360,12 +1318,12 @@ const styles = {
 
     title: {
         margin: 0,
-        fontSize: "42px"
+        fontSize: "36px"
     },
 
     subtitle: {
         marginTop: "8px",
-        fontSize: "22px"
+        fontSize: "20px"
     },
 
     logoutButton: {
@@ -386,7 +1344,6 @@ const styles = {
 
     welcome: {
         textAlign: "center",
-        color: "#334155",
         marginBottom: "30px"
     },
 
@@ -399,22 +1356,23 @@ const styles = {
 
     card: {
         background: "white",
-        padding: "30px",
+        padding: "25px",
         borderRadius: "12px",
         textAlign: "center",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.08)"
+        boxShadow:
+            "0 4px 12px rgba(0,0,0,0.08)"
     },
 
     cardTitle: {
-        fontSize: "22px",
+        fontSize: "17px",
         fontWeight: "700",
         color: "#475569"
     },
 
     cardNumber: {
-        fontSize: "36px",
+        fontSize: "30px",
         fontWeight: "700",
-        marginTop: "15px",
+        marginTop: "12px",
         color: "#2563eb"
     },
 
@@ -423,20 +1381,133 @@ const styles = {
         marginTop: "30px",
         padding: "30px",
         borderRadius: "12px",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.08)"
+        boxShadow:
+            "0 4px 12px rgba(0,0,0,0.08)"
+    },
+
+    sectionHeader: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "20px",
+        gap: "15px"
     },
 
     sectionTitle: {
-        color: "#1e293b",
+        margin: 0
+    },
+
+    addButton: {
+        background: "#2563eb",
+        color: "white",
+        border: "none",
+        padding: "11px 18px",
+        borderRadius: "7px",
+        cursor: "pointer",
+        fontSize: "15px"
+    },
+
+    form: {
+        background: "#f8fafc",
+        padding: "22px",
+        borderRadius: "10px",
         marginBottom: "25px"
+    },
+
+    label: {
+        display: "block",
+        fontWeight: "600",
+        marginTop: "12px",
+        marginBottom: "7px"
+    },
+
+    input: {
+        width: "100%",
+        padding: "11px",
+        boxSizing: "border-box",
+        border: "1px solid #cbd5e1",
+        borderRadius: "6px",
+        fontSize: "15px"
+    },
+
+    textarea: {
+        width: "100%",
+        padding: "11px",
+        boxSizing: "border-box",
+        border: "1px solid #cbd5e1",
+        borderRadius: "6px",
+        resize: "vertical"
+    },
+
+    roomGrid: {
+        display: "grid",
+        gridTemplateColumns:
+            "repeat(auto-fit, minmax(250px, 1fr))",
+        gap: "20px"
+    },
+
+    roomCard: {
+        border: "1px solid #e2e8f0",
+        borderRadius: "10px",
+        padding: "20px",
+        background: "#ffffff"
+    },
+
+    buttons: {
+        display: "flex",
+        gap: "10px",
+        marginTop: "15px",
+        flexWrap: "wrap"
+    },
+
+    editButton: {
+        background: "#2563eb",
+        color: "white",
+        border: "none",
+        padding: "9px 16px",
+        borderRadius: "6px",
+        cursor: "pointer"
+    },
+
+    deleteButton: {
+        background: "#dc2626",
+        color: "white",
+        border: "none",
+        padding: "9px 16px",
+        borderRadius: "6px",
+        cursor: "pointer"
+    },
+
+    updateButton: {
+        background: "#16a34a",
+        color: "white",
+        border: "none",
+        padding: "10px 18px",
+        borderRadius: "6px",
+        cursor: "pointer"
+    },
+
+    cancelButton: {
+        background: "#64748b",
+        color: "white",
+        border: "none",
+        padding: "10px 18px",
+        borderRadius: "6px",
+        cursor: "pointer"
+    },
+
+    editBox: {
+        marginTop: "20px",
+        padding: "20px",
+        background: "#f8fafc",
+        borderRadius: "8px"
     },
 
     complaint: {
         border: "1px solid #e2e8f0",
         borderRadius: "10px",
         padding: "22px",
-        marginBottom: "20px",
-        background: "#ffffff"
+        marginBottom: "20px"
     },
 
     complaintHeader: {
@@ -446,8 +1517,7 @@ const styles = {
     },
 
     complaintTitle: {
-        margin: "0 0 8px",
-        color: "#1e293b"
+        margin: "0 0 8px"
     },
 
     student: {
@@ -456,8 +1526,6 @@ const styles = {
     },
 
     description: {
-        color: "#334155",
-        fontSize: "16px",
         lineHeight: "1.6"
     },
 
@@ -466,7 +1534,8 @@ const styles = {
         padding: "7px 14px",
         borderRadius: "20px",
         fontWeight: "700",
-        textTransform: "capitalize"
+        textTransform: "capitalize",
+        display: "inline-block"
     },
 
     pending: {
@@ -492,76 +1561,55 @@ const styles = {
         color: "#166534"
     },
 
-    editButton: {
-        background: "#2563eb",
-        color: "white",
-        border: "none",
-        padding: "10px 18px",
-        borderRadius: "6px",
-        cursor: "pointer"
+    feeSummary: {
+        display: "grid",
+        gridTemplateColumns:
+            "repeat(auto-fit, minmax(180px, 1fr))",
+        gap: "15px",
+        marginBottom: "25px"
     },
 
-    editBox: {
-        marginTop: "20px",
-        padding: "20px",
+    feeSummaryCard: {
         background: "#f8fafc",
-        borderRadius: "8px"
-    },
-
-    label: {
-        display: "block",
-        fontWeight: "600",
-        marginBottom: "7px",
-        marginTop: "12px"
-    },
-
-    input: {
-        width: "100%",
-        padding: "11px",
-        border: "1px solid #cbd5e1",
-        borderRadius: "6px",
-        boxSizing: "border-box"
-    },
-
-    textarea: {
-        width: "100%",
-        padding: "11px",
-        border: "1px solid #cbd5e1",
-        borderRadius: "6px",
-        boxSizing: "border-box",
-        resize: "vertical"
-    },
-
-    buttons: {
+        padding: "20px",
+        borderRadius: "10px",
+        border: "1px solid #e2e8f0",
         display: "flex",
-        gap: "10px",
-        marginTop: "15px"
+        flexDirection: "column",
+        gap: "8px"
     },
 
-    updateButton: {
-        background: "#16a34a",
-        color: "white",
-        border: "none",
-        padding: "10px 18px",
-        borderRadius: "6px",
-        cursor: "pointer"
+    table: {
+        width: "100%",
+        borderCollapse: "collapse"
     },
 
-    cancelButton: {
-        background: "#64748b",
-        color: "white",
-        border: "none",
-        padding: "10px 18px",
-        borderRadius: "6px",
-        cursor: "pointer"
+    th: {
+        textAlign: "left",
+        padding: "14px",
+        background: "#f1f5f9",
+        borderBottom: "1px solid #cbd5e1"
+    },
+
+    td: {
+        padding: "14px",
+        borderBottom: "1px solid #e2e8f0",
+        verticalAlign: "top"
+    },
+
+    feeTableWrapper: {
+        overflowX: "auto"
     },
 
     message: {
-        color: "#475569"
+        color: "#64748b"
     },
 
     error: {
-        color: "#dc2626"
+        color: "#dc2626",
+        background: "#fee2e2",
+        padding: "12px",
+        borderRadius: "7px"
     }
 };
 
